@@ -8,11 +8,11 @@ RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl openssl
 COPY package*.json ./
 RUN npm ci --omit=dev
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
+RUN npx prisma generate
+COPY --from=builder /app/dist ./dist
 EXPOSE 3001
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]

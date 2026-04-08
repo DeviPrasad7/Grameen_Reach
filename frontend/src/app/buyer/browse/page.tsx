@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { productsApi, cartApi } from '@/lib/api';
-import { useAuthStore } from '@/lib/store';
+import { useAuthStore, useLangStore } from '@/lib/store';
 
 interface Product {
   id: string;
@@ -20,15 +20,15 @@ interface Product {
   imageUrls: string[];
   district?: string;
   farmer: { name: string };
-  category: { name: string };
+  category: { name: string; nameTE?: string };
 }
 
 export default function BrowsePage() {
   const { user } = useAuthStore();
+  const { lang, t } = useLangStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [lang, setLang] = useState<'en' | 'te'>('en');
   const [addingId, setAddingId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
 
@@ -36,7 +36,7 @@ export default function BrowsePage() {
     setLoading(true);
     try {
       const res = await productsApi.list(q ? { search: q } : undefined);
-      setProducts(res.data);
+      setProducts(res.data?.items || res.data || []);
     } catch {
       setProducts([]);
     } finally {
@@ -56,10 +56,10 @@ export default function BrowsePage() {
     setAddingId(productId);
     try {
       await cartApi.addItem(productId, 1);
-      setToast('Added to cart!');
+      setToast(t({ en: 'Added to cart!', te: 'కార్ట్‌కు జోడించబడింది!' }));
       setTimeout(() => setToast(''), 2000);
     } catch {
-      setToast('Failed to add to cart');
+      setToast(t({ en: 'Failed to add to cart', te: 'కార్ట్‌కు జోడించడం విఫలమైంది' }));
       setTimeout(() => setToast(''), 2000);
     } finally {
       setAddingId(null);
@@ -68,8 +68,8 @@ export default function BrowsePage() {
 
   const price = (p: Product) => {
     if (p.priceType === 'FIXED') return `₹${p.fixedPrice}`;
-    if (p.priceType === 'BID') return `Bid from ₹${p.minBidPrice}`;
-    return `₹${p.fixedPrice} / Bid ₹${p.minBidPrice}+`;
+    if (p.priceType === 'BID') return `${t({ en: 'Bid from', te: 'బిడ్' })} ₹${p.minBidPrice}`;
+    return `₹${p.fixedPrice} / ${t({ en: 'Bid', te: 'బిడ్' })} ₹${p.minBidPrice}+`;
   };
 
   return (
@@ -77,21 +77,21 @@ export default function BrowsePage() {
       <div className="bg-primary-700 text-white py-8 px-4">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold mb-1">
-            {lang === 'te' ? 'తాజా ఉత్పత్తులు' : 'Fresh Produce'}
+            {t({ en: 'Fresh Produce', te: 'తాజా ఉత్పత్తులు' })}
           </h1>
           <p className="text-primary-200 text-sm">
-            {lang === 'te' ? 'నేరుగా రైతు నుండి' : 'Direct from verified AP/TS farmers'}
+            {t({ en: 'Direct from verified AP/TS farmers', te: 'ధృవీకరించిన AP/TS రైతుల నుండి నేరుగా' })}
           </p>
           <form onSubmit={handleSearch} className="mt-4 flex gap-2 max-w-lg">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={lang === 'te' ? 'వెతకండి...' : 'Search tomatoes, dal, mango...'}
+              placeholder={t({ en: 'Search tomatoes, dal, mango...', te: 'టమాటా, పప్పు, మామిడి వెతకండి...' })}
               className="flex-1 px-4 py-2 rounded-lg text-gray-900 text-sm focus:outline-none"
             />
             <button type="submit" className="px-4 py-2 bg-saffron-500 rounded-lg text-sm font-semibold hover:bg-saffron-600">
-              🔍
+              {t({ en: 'Search', te: 'వెతకండి' })}
             </button>
           </form>
         </div>
@@ -107,7 +107,7 @@ export default function BrowsePage() {
         ) : products.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <div className="text-5xl mb-3">🌾</div>
-            <p>No products found</p>
+            <p>{t({ en: 'No products found', te: 'ఉత్పత్తులు కనుగొనబడలేదు' })}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -115,19 +115,13 @@ export default function BrowsePage() {
               <div key={p.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                 <div className="relative h-40 bg-gray-100">
                   {p.imageUrls?.[0] ? (
-                    <Image
-                      src={p.imageUrls[0]}
-                      alt={p.title}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
+                    <Image src={p.imageUrls[0]} alt={p.title} fill className="object-cover" unoptimized />
                   ) : (
                     <div className="flex items-center justify-center h-full text-4xl">🥬</div>
                   )}
                   {p.organic && (
                     <span className="absolute top-2 left-2 bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full">
-                      Organic
+                      {t({ en: 'Organic', te: 'సేంద్రీయ' })}
                     </span>
                   )}
                   <span className="absolute top-2 right-2 bg-white text-gray-700 text-xs px-2 py-0.5 rounded-full border">
@@ -147,21 +141,21 @@ export default function BrowsePage() {
                     </span>
                   </div>
                   {p.grade && (
-                    <span className="text-xs text-gray-400">Grade: {p.grade}</span>
+                    <span className="text-xs text-gray-400">{t({ en: 'Grade', te: 'గ్రేడ్' })}: {p.grade}</span>
                   )}
                   <div className="flex gap-2 mt-3">
                     <Link
                       href={`/buyer/browse/${p.id}`}
                       className="flex-1 text-center text-xs py-1.5 rounded-lg border border-primary-300 text-primary-600 hover:bg-primary-50"
                     >
-                      View
+                      {t({ en: 'View', te: 'చూడండి' })}
                     </Link>
                     <button
                       onClick={() => addToCart(p.id)}
                       disabled={addingId === p.id}
                       className="flex-1 text-xs py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
                     >
-                      {addingId === p.id ? '...' : '+ Cart'}
+                      {addingId === p.id ? '...' : t({ en: '+ Cart', te: '+ కార్ట్' })}
                     </button>
                   </div>
                 </div>

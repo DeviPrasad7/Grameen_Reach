@@ -53,6 +53,25 @@ export class FarmerService {
     });
   }
 
+  async getMyDocs(userId: string) {
+    const profile = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    if (!profile) throw new NotFoundException('Farmer profile not found');
+    return this.prisma.farmerDoc.findMany({
+      where: { farmerProfileId: profile.id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getAllFarmers() {
+    return this.prisma.farmerProfile.findMany({
+      include: {
+        user: { select: { name: true, email: true, phone: true } },
+        docs: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getPendingVerifications() {
     return this.prisma.farmerProfile.findMany({
       where: { verificationLevel: 'LEVEL_0' },

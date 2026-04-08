@@ -12,6 +12,10 @@ import { QueryProductsDto } from './dto/query-products.dto';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
+  async getCategories() {
+    return this.prisma.category.findMany({ orderBy: { name: 'asc' } });
+  }
+
   async create(farmerId: string, dto: CreateProductDto) {
     // Ensure farmer is Level 1 verified
     const profile = await this.prisma.farmerProfile.findUnique({ where: { userId: farmerId } });
@@ -53,7 +57,13 @@ export class ProductsService {
     const limit = parseInt(query.limit ?? '20', 10);
     const skip = (page - 1) * limit;
 
-    const where: any = { status: 'ACTIVE' };
+    const where: any = {};
+
+    if (query.farmerId) {
+      where.farmerId = query.farmerId;
+    } else {
+      where.status = 'ACTIVE';
+    }
 
     if (query.category) {
       where.category = { name: { contains: query.category, mode: 'insensitive' } };

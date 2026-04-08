@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import Navbar from '@/components/layout/Navbar';
 
 export const metadata: Metadata = {
   title: 'Grameen Reach – AP/TS Farmer Marketplace',
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-white">
+        <Navbar />
         {children}
       </body>
     </html>

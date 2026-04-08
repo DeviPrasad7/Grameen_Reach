@@ -30,6 +30,11 @@ export class QueryProductsDto {
   @IsString()
   search?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  farmerId?: string;
+
   @ApiPropertyOptional({ default: '1' })
   @IsOptional()
   @IsString()

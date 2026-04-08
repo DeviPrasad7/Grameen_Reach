@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  Optional,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
@@ -25,6 +24,12 @@ import { Role } from '../common/enums/role.enum';
 @Controller('products')
 export class ProductsController {
   constructor(private productsService: ProductsService) {}
+
+  @Get('categories')
+  @ApiOperation({ summary: 'List all categories (public)' })
+  getCategories() {
+    return this.productsService.getCategories();
+  }
 
   @Get()
   @ApiOperation({ summary: 'List products (public)' })

@@ -114,6 +114,11 @@ export const aiApi = {
   auditLogs: (params?: Record<string, unknown>) => api.get('/ai/audit-logs', { params }),
 };
 
+// ── Categories ───────────────────────────────────────────────────────────
+export const categoriesApi = {
+  list: () => api.get('/products/categories'),
+};
+
 // ── Files ─────────────────────────────────────────────────────────────────
 export const filesApi = {
   upload: (formData: FormData) =>

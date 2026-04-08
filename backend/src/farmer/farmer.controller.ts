@@ -54,6 +54,20 @@ export class FarmerController {
     return this.farmerService.addDoc(user.id, dto);
   }
 
+  @Get('farmer/docs')
+  @Roles(Role.FARMER)
+  @ApiOperation({ summary: 'Get own verification documents' })
+  getMyDocs(@CurrentUser() user: any) {
+    return this.farmerService.getMyDocs(user.id);
+  }
+
+  @Get('admin/farmers')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Admin: get all farmers' })
+  getAllFarmers() {
+    return this.farmerService.getAllFarmers();
+  }
+
   @Get('admin/farmers/pending')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Admin: get farmers pending verification' })
