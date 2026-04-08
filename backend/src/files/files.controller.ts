@@ -31,7 +31,7 @@ export class FilesController {
         if (allowed.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new BadRequestException('Only images and PDFs are allowed'), false);
+          cb(new Error('Only images and PDFs are allowed'), false);
         }
       },
     }),

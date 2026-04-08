@@ -8,10 +8,6 @@ const nextConfig = {
       { protocol: 'http',  hostname: 'localhost' },
     ],
   },
-  i18n: {
-    locales: ['en', 'te'],
-    defaultLocale: 'en',
-  },
 };
 
 module.exports = nextConfig;
