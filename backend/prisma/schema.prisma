@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  BUYER
+  FARMER
+  ADMIN
+}
+
+enum VerificationLevel {
+  LEVEL_0
+  LEVEL_1
+}
+
+enum PriceType {
+  FIXED
+  BID
+  HYBRID
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  SOLD_OUT
+  PAUSED
+  REMOVED
+}
+
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PACKED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  DUMMY_CARD
+  STRIPE
+  RAZORPAY
+}
+
+enum DocType {
+  RATION_CARD
+  FARMER_ID
+  LAND_DOCUMENT
+  AADHAAR
+  OTHER
+}
+
+enum DocStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String
+  name          String
+  role          Role      @default(BUYER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  farmerProfile FarmerProfile?
+  products      Product[]
+  bids          Bid[]
+  cart          Cart?
+  orders        Order[]
+  aiRequests    AiRequest[]
+}
+
+model FarmerProfile {
+  id                 String            @id @default(cuid())
+  userId             String            @unique
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verificationLevel  VerificationLevel @default(LEVEL_0)
+  village            String?
+  mandal             String?
+  district           String
+  pincode            String
+  bio                String?
+  bankAccountName    String?
+  bankAccountNumber  String?
+  bankIfsc           String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  docs               FarmerDoc[]
+  subOrders          SubOrder[]
+}
+
+model FarmerDoc {
+  id              String        @id @default(cuid())
+  farmerProfileId String
+  farmerProfile   FarmerProfile @relation(fields: [farmerProfileId], references: [id], onDelete: Cascade)
+  docType         DocType
+  docNumber       String?
+  fileUrl         String
+  notes           String?
+  status          DocStatus     @default(PENDING)
+  reviewedBy      String?
+  reviewNotes     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  nameTE   String
+  icon     String?
+  products Product[]
+}
+
+model Product {
+  id             String        @id @default(cuid())
+  farmerId       String
+  farmer         User          @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       Category      @relation(fields: [categoryId], references: [id])
+  title          String
+  titleTE        String?
+  description    String?
+  descriptionTE  String?
+  unit           String
+  priceType      PriceType     @default(FIXED)
+  fixedPrice     Float?
+  minBidPrice    Float?
+  autoBidAccept  Float?
+  bidEndsAt      DateTime?
+  grade          String?
+  organic        Boolean       @default(false)
+  moisture       Float?
+  harvestDate    DateTime?
+  minQty         Float         @default(1)
+  availableQty   Float
+  imageUrls      String[]
+  village        String?
+  district       String?
+  pincode        String?
+  status         ProductStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  bids           Bid[]
+  cartItems      CartItem[]
+  subOrderItems  SubOrderItem[]
+}
+
+model Bid {
+  id             String    @id @default(cuid())
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  buyerId        String
+  buyer          User      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  amount         Float
+  message        String?
+  status         BidStatus @default(PENDING)
+  counterAmount  Float?
+  counterMessage String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty       Float
+  createdAt DateTime @default(now())
+
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  buyerId         String
+  buyer           User          @relation(fields: [buyerId], references: [id])
+  totalAmount     Float
+  paymentMethod   PaymentMethod @default(COD)
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentRef      String?
+  deliveryAddress Json
+  status          OrderStatus   @default(PLACED)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  subOrders       SubOrder[]
+}
+
+model SubOrder {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  farmerProfileId String
+  farmerProfile   FarmerProfile @relation(fields: [farmerProfileId], references: [id])
+  amount          Float
+  status          OrderStatus   @default(PLACED)
+  deliveryFee     Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items           SubOrderItem[]
+}
+
+model SubOrderItem {
+  id         String   @id @default(cuid())
+  subOrderId String
+  subOrder   SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  qty        Float
+  unitPrice  Float
+  createdAt  DateTime @default(now())
+}
+
+model GovtPrice {
+  id         String   @id @default(cuid())
+  commodity  String
+  variety    String?
+  market     String
+  district   String
+  state      String   @default("AP/TS")
+  date       DateTime
+  unit       String   @default("Quintal")
+  minPrice   Float
+  maxPrice   Float
+  modalPrice Float
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([commodity, district, date])
+}
+
+model AiRequest {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  feature    String
+  model      String
+  prompt     String
+  response   String
+  tokens     Int      @default(0)
+  cached     Boolean  @default(false)
+  durationMs Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model ServiceableArea {
+  id       String @id @default(cuid())
+  pincode  String @unique
+  district String
+  flatFee  Float  @default(50)
+}
