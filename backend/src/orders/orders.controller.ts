@@ -25,7 +25,7 @@ export class OrdersController {
   constructor(private ordersService: OrdersService) {}
 
   @Post()
-  @Roles(Role.BUYER)
+  @Roles(Role.BUYER, Role.FARMER)
   @ApiOperation({ summary: 'Create order from cart (splits per farmer)' })
   create(@CurrentUser() user: any, @Body() dto: CreateOrderDto) {
     return this.ordersService.createFromCart(user.id, dto);
@@ -53,5 +53,12 @@ export class OrdersController {
     @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.ordersService.updateSubOrderStatus(orderId, subOrderId, user.id, dto);
+  }
+
+  @Patch(':id/cancel')
+  @Roles(Role.BUYER, Role.FARMER)
+  @ApiOperation({ summary: 'Cancel an order (only if PLACED or CONFIRMED)' })
+  cancel(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.ordersService.cancelOrder(id, user.id, user.role);
   }
 }

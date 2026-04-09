@@ -12,6 +12,11 @@ export class QueryProductsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  categoryId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   district?: string;
 
   @ApiPropertyOptional({ enum: PriceType })

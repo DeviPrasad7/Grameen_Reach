@@ -15,13 +15,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Public pages that shouldn't trigger auth redirect
+const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register', '/buyer/browse'];
+
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('gr_token');
-      localStorage.removeItem('gr_user');
-      window.location.href = '/auth/login';
+      const path = window.location.pathname;
+      const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith('/buyer/browse/'));
+      if (!isPublic) {
+        localStorage.removeItem('gr_token');
+        localStorage.removeItem('gr_auth');
+        window.location.href = '/auth/login';
+      }
     }
     return Promise.reject(err);
   },
@@ -60,8 +67,16 @@ export const ordersApi = {
   create: (data: unknown) => api.post('/orders', data),
   list: () => api.get('/orders'),
   get: (id: string) => api.get(`/orders/${id}`),
+  cancel: (id: string) => api.patch(`/orders/${id}/cancel`),
   updateSubOrderStatus: (orderId: string, subOrderId: string, status: string) =>
     api.patch(`/orders/${orderId}/suborders/${subOrderId}/status`, { status }),
+};
+
+// ── Payments ──────────────────────────────────────────────────────────────
+export const paymentsApi = {
+  initiate: (data: { orderId: string; method: string }) =>
+    api.post('/payments/initiate', data),
+  getStatus: (orderId: string) => api.get(`/payments/${orderId}`),
 };
 
 // ── Bids ──────────────────────────────────────────────────────────────────
@@ -88,6 +103,12 @@ export const adminApi = {
   verifyFarmer: (profileId: string, data: unknown) =>
     api.patch(`/admin/farmers/${profileId}/verify`, data),
   allFarmers: () => api.get('/admin/farmers'),
+};
+
+// ── Users ─────────────────────────────────────────────────────────────────
+export const usersApi = {
+  me: () => api.get('/users/me'),
+  update: (data: unknown) => api.patch('/users/me', data),
 };
 
 // ── Govt Prices ───────────────────────────────────────────────────────────

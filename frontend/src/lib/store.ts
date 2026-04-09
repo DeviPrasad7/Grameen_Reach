@@ -6,14 +6,17 @@ export interface AuthUser {
   email: string;
   name: string;
   role: 'BUYER' | 'FARMER' | 'ADMIN';
+  phone?: string;
 }
 
 interface AuthState {
   token: string | null;
   user: AuthUser | null;
+  _hasHydrated: boolean;
   setAuth: (token: string, user: AuthUser) => void;
   logout: () => void;
   isLoggedIn: () => boolean;
+  setHasHydrated: (v: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -21,6 +24,8 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       token: null,
       user: null,
+      _hasHydrated: false,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
       setAuth: (token, user) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('gr_token', token);
@@ -35,7 +40,12 @@ export const useAuthStore = create<AuthState>()(
       },
       isLoggedIn: () => !!get().token,
     }),
-    { name: 'gr_auth' },
+    {
+      name: 'gr_auth',
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    },
   ),
 );
 
@@ -72,5 +82,38 @@ export const useLangStore = create<LangState>()(
       t: (obj) => obj[get().lang],
     }),
     { name: 'gr_lang' },
+  ),
+);
+
+// ── Cart count store (lightweight, no persistence) ────────────────────────
+interface CartCountState {
+  count: number;
+  setCount: (n: number) => void;
+}
+
+export const useCartCountStore = create<CartCountState>((set) => ({
+  count: 0,
+  setCount: (n) => set({ count: n }),
+}));
+
+// ── Wishlist store (localStorage persisted) ────────────────────────
+interface WishlistState {
+  items: string[]; // product IDs
+  add: (id: string) => void;
+  remove: (id: string) => void;
+  has: (id: string) => boolean;
+  clear: () => void;
+}
+
+export const useWishlistStore = create<WishlistState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      add: (id) => set((s) => ({ items: s.items.includes(id) ? s.items : [...s.items, id] })),
+      remove: (id) => set((s) => ({ items: s.items.filter((i) => i !== id) })),
+      has: (id) => get().items.includes(id),
+      clear: () => set({ items: [] }),
+    }),
+    { name: 'gr_wishlist' },
   ),
 );

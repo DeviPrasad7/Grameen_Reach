@@ -24,9 +24,19 @@ export class PaymentsService {
       const ref = `DUMMY-${Date.now()}`;
       await this.prisma.order.update({
         where: { id: dto.orderId },
-        data: { paymentMethod: 'DUMMY_CARD', paymentStatus: 'PAID', paymentRef: ref },
+        data: {
+          paymentMethod: 'DUMMY_CARD',
+          paymentStatus: 'PAID',
+          paymentRef: ref,
+          status: 'CONFIRMED',
+        },
       });
-      return { method: 'DUMMY_CARD', status: 'PAID', ref, message: 'Dummy payment successful' };
+      // Also confirm all sub-orders
+      await this.prisma.subOrder.updateMany({
+        where: { orderId: dto.orderId, status: 'PLACED' },
+        data: { status: 'CONFIRMED' },
+      });
+      return { method: 'DUMMY_CARD', status: 'PAID', ref, message: 'Payment successful! Order confirmed.' };
     }
 
     if (dto.method === 'STRIPE') {

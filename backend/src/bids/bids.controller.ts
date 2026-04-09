@@ -25,8 +25,8 @@ export class BidsController {
   constructor(private bidsService: BidsService) {}
 
   @Post()
-  @Roles(Role.BUYER)
-  @ApiOperation({ summary: 'Place a bid on a product (BUYER only)' })
+  @Roles(Role.BUYER, Role.FARMER)
+  @ApiOperation({ summary: 'Place a bid on a product' })
   create(@CurrentUser() user: any, @Body() dto: CreateBidDto) {
     return this.bidsService.createBid(user.id, dto);
   }
@@ -38,8 +38,8 @@ export class BidsController {
   }
 
   @Get('my')
-  @Roles(Role.BUYER)
-  @ApiOperation({ summary: 'Buyer: get my bids' })
+  @Roles(Role.BUYER, Role.FARMER)
+  @ApiOperation({ summary: 'Get my placed bids' })
   getMyBids(@CurrentUser() user: any) {
     return this.bidsService.getMyBids(user.id);
   }

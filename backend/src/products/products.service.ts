@@ -65,7 +65,9 @@ export class ProductsService {
       where.status = 'ACTIVE';
     }
 
-    if (query.category) {
+    if (query.categoryId) {
+      where.categoryId = query.categoryId;
+    } else if (query.category) {
       where.category = { name: { contains: query.category, mode: 'insensitive' } };
     }
     if (query.district) {

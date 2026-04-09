@@ -2,23 +2,26 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
+import { Sprout, Mail, Lock, LogIn, KeyRound, Loader2, ShieldCheck, Wheat, ShoppingCart } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuthStore, useLangStore } from '@/lib/store';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setAuth, user } = useAuthStore();
+  const { setAuth, user, _hasHydrated } = useAuthStore();
   const { t } = useLangStore();
 
   const [email, setEmail] = useState(searchParams?.get('email') || '');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) redirectByRole(user.role);
-  }, [user]);
+    if (_hasHydrated && user) {
+      redirectByRole(user.role);
+    }
+  }, [_hasHydrated, user]);
 
   const redirectByRole = (role: string) => {
     if (role === 'ADMIN') router.push('/admin/farmers');
@@ -28,67 +31,155 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setLoading(true);
     try {
       const res = await authApi.login(email, password);
       setAuth(res.data.accessToken, res.data.user);
+      toast.success(
+        t({ en: 'Welcome back!', te: 'తిరిగి స్వాగతం!' })
+      );
       redirectByRole(res.data.user.role);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg || t({ en: 'Login failed. Please check your credentials.', te: 'లాగిన్ విఫలమైంది. దయచేసి మీ ఆధారాలను తనిఖీ చేయండి.' }));
-    } finally { setLoading(false); }
+      toast.error(
+        msg || t({ en: 'Login failed. Please check your credentials.', te: 'లాగిన్ విఫలమైంది. దయచేసి మీ ఆధారాలను తనిఖీ చేయండి.' })
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fillDemo = (e: string, p: string) => { setEmail(e); setPassword(p); };
+  const fillDemo = (e: string, p: string) => {
+    setEmail(e);
+    setPassword(p);
+    toast.success(t({ en: 'Demo credentials filled', te: 'డెమో ఆధారాలు నింపబడ్డాయి' }));
+  };
+
+  const demoAccounts = [
+    {
+      label: { en: 'Admin', te: 'అడ్మిన్' },
+      icon: <ShieldCheck className="w-3.5 h-3.5" />,
+      email: 'admin@grameen.com',
+      password: 'Admin@123',
+    },
+    {
+      label: { en: 'Farmer (Verified)', te: 'రైతు (ధృవీకరించిన)' },
+      icon: <Wheat className="w-3.5 h-3.5" />,
+      email: 'farmer1@grameen.com',
+      password: 'Farmer@123',
+    },
+    {
+      label: { en: 'Farmer (Pending)', te: 'రైతు (పెండింగ్)' },
+      icon: <Sprout className="w-3.5 h-3.5" />,
+      email: 'farmer2@grameen.com',
+      password: 'Farmer@123',
+    },
+    {
+      label: { en: 'Buyer', te: 'కొనుగోలుదారు' },
+      icon: <ShoppingCart className="w-3.5 h-3.5" />,
+      email: 'buyer1@grameen.com',
+      password: 'Buyer@123',
+    },
+  ];
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full max-w-md animate-slide-up">
+      {/* Logo & Header */}
       <div className="text-center mb-8">
-        <Link href="/" className="text-4xl">🌾</Link>
-        <h1 className="text-2xl font-bold text-primary-800 mt-2">Grameen Reach</h1>
-        <p className="text-gray-500 text-sm mt-1">{t({ en: 'Sign in to your account', te: 'మీ ఖాతాలో సైన్ ఇన్ చేయండి' })}</p>
+        <Link href="/" className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-100 text-primary-600 mb-4 hover:bg-primary-200 transition-colors">
+          <Sprout className="w-7 h-7" />
+        </Link>
+        <h1 className="text-2xl font-bold text-slate-800">Grameen Reach</h1>
+        <p className="text-slate-500 text-sm mt-1">
+          {t({ en: 'Sign in to your account', te: 'మీ ఖాతాలో సైన్ ఇన్ చేయండి' })}
+        </p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg p-8 border border-primary-100">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Card */}
+      <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 p-8 border border-slate-100 animate-fade-in">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t({ en: 'Email', te: 'ఇమెయిల్' })}</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 text-sm"
-              placeholder="your@email.com" />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              {t({ en: 'Email', te: 'ఇమెయిల్' })}
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent text-sm bg-slate-50 transition-colors"
+                placeholder="your@email.com"
+              />
+            </div>
           </div>
+
+          {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t({ en: 'Password', te: 'పాస్‌వర్డ్' })}</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 text-sm"
-              placeholder="••••••••" />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              {t({ en: 'Password', te: 'పాస్\u200Cవర్డ్' })}
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent text-sm bg-slate-50 transition-colors"
+                placeholder="••••••••"
+              />
+            </div>
           </div>
-          {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{error}</div>}
-          <button type="submit" disabled={loading}
-            className="w-full py-2.5 px-4 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors">
-            {loading ? t({ en: 'Signing in...', te: 'సైన్ ఇన్ అవుతోంది...' }) : t({ en: 'Sign In', te: 'సైన్ ఇన్' })}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2.5 px-4 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 disabled:opacity-50 transition-all shadow-md shadow-primary-600/20 hover:shadow-primary-600/30 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {t({ en: 'Signing in...', te: 'సైన్ ఇన్ అవుతోంది...' })}
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" />
+                {t({ en: 'Sign In', te: 'సైన్ ఇన్' })}
+              </>
+            )}
           </button>
         </form>
 
-        <div className="mt-4 text-center text-sm text-gray-500">
+        {/* Register link */}
+        <div className="mt-5 text-center text-sm text-slate-500">
           {t({ en: "Don't have an account?", te: 'ఖాతా లేదా?' })}{' '}
-          <Link href="/auth/register" className="text-primary-600 font-medium hover:underline">
+          <Link href="/auth/register" className="text-primary-600 font-semibold hover:text-primary-700 hover:underline transition-colors">
             {t({ en: 'Register', te: 'నమోదు' })}
           </Link>
         </div>
 
-        <div className="mt-6 border-t border-gray-100 pt-4">
-          <p className="text-xs text-gray-400 text-center mb-3">{t({ en: 'Quick demo login', te: 'త్వరిత డెమో లాగిన్' })}</p>
+        {/* Demo accounts */}
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <div className="flex items-center gap-2 justify-center mb-3">
+            <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+              {t({ en: 'Quick demo login', te: 'త్వరిత డెమో లాగిన్' })}
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: { en: '🔑 Admin', te: '🔑 అడ్మిన్' }, e: 'admin@grameen.com', p: 'Admin@123' },
-              { label: { en: '🌾 Farmer (Verified)', te: '🌾 రైతు (ధృవీకరించిన)' }, e: 'farmer1@grameen.com', p: 'Farmer@123' },
-              { label: { en: '🌱 Farmer (Pending)', te: '🌱 రైతు (పెండింగ్)' }, e: 'farmer2@grameen.com', p: 'Farmer@123' },
-              { label: { en: '🛒 Buyer', te: '🛒 కొనుగోలుదారు' }, e: 'buyer1@grameen.com', p: 'Buyer@123' },
-            ].map((d) => (
-              <button key={d.e} type="button" onClick={() => fillDemo(d.e, d.p)}
-                className="text-xs px-2 py-1.5 rounded-md border border-primary-200 text-primary-700 hover:bg-primary-50 text-left">
-                {t(d.label)}
+            {demoAccounts.map((d) => (
+              <button
+                key={d.email}
+                type="button"
+                onClick={() => fillDemo(d.email, d.password)}
+                className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-all text-left"
+              >
+                <span className="text-primary-500">{d.icon}</span>
+                <span className="font-medium">{t(d.label)}</span>
               </button>
             ))}
           </div>
@@ -100,8 +191,15 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center px-4">
-      <Suspense fallback={<div className="text-gray-400">Loading...</div>}>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-emerald-50 flex items-center justify-center px-4 py-12">
+      <Suspense
+        fallback={
+          <div className="flex items-center gap-2 text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        }
+      >
         <LoginForm />
       </Suspense>
     </div>

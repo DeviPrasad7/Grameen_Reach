@@ -201,6 +201,53 @@ export class OrdersService {
     return order;
   }
 
+  async cancelOrder(orderId: string, userId: string, role: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        subOrders: { include: { items: true } },
+      },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.buyerId !== userId && role !== 'ADMIN') {
+      throw new ForbiddenException('Not your order');
+    }
+
+    const cancellable = ['PLACED', 'CONFIRMED'];
+    if (!cancellable.includes(order.status)) {
+      throw new BadRequestException(
+        `Cannot cancel order with status ${order.status}. Only PLACED or CONFIRMED orders can be cancelled.`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Cancel all sub-orders
+      await tx.subOrder.updateMany({
+        where: { orderId, status: { in: ['PLACED', 'CONFIRMED'] } },
+        data: { status: 'CANCELLED' },
+      });
+
+      // Restore product quantities
+      for (const sub of order.subOrders) {
+        for (const item of sub.items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { availableQty: { increment: item.qty } },
+          });
+        }
+      }
+
+      // Cancel the parent order
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: 'CANCELLED' },
+      });
+    });
+
+    return this.findOne(orderId, userId, role);
+  }
+
   async updateSubOrderStatus(
     orderId: string,
     subOrderId: string,
