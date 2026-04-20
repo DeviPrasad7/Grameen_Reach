@@ -191,8 +191,8 @@ export default function MyBidsPage() {
                             src={bid.product.imageUrls[0]}
                             alt={bid.product.title}
                             fill
+                            sizes="80px"
                             className="object-cover"
-                            unoptimized
                           />
                         ) : (
                           <div className="flex items-center justify-center h-full text-3xl">🥬</div>

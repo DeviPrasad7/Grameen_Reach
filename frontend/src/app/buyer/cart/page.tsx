@@ -69,9 +69,14 @@ export default function CartPage() {
   };
 
   const removeItem = async (productId: string) => {
-    await cartApi.removeItem(productId);
-    toast.success(t({ en: 'Item removed', te: 'ఐటమ్ తొలగించబడింది' }));
-    loadCart();
+    try {
+      await cartApi.removeItem(productId);
+      toast.success(t({ en: 'Item removed', te: 'ఐటమ్ తొలగించబడింది' }));
+      loadCart();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || t({ en: 'Failed to remove item', te: 'ఐటమ్ తొలగించడం విఫలమైంది' }));
+    }
   };
 
   const total = cart.reduce((sum, item) => {
@@ -89,7 +94,12 @@ export default function CartPage() {
   };
 
   const placeOrder = async () => {
-    if (!address.street || !address.city || !address.pincode) {
+    if (placing) return;  // double-click guard
+    if (cart.length === 0) {
+      toast.error(t({ en: 'Your cart is empty', te: 'మీ కార్ట్ ఖాళీగా ఉంది' }));
+      return;
+    }
+    if (!address.street.trim() || !address.city.trim() || !address.pincode.trim()) {
       toast.error(t({ en: 'Please fill delivery address', te: 'దయచేసి డెలివరీ చిరునామా నింపండి' }));
       return;
     }
@@ -174,7 +184,7 @@ export default function CartPage() {
                   <div key={item.productId} className="flex items-center gap-4 p-4">
                     <div className="w-16 h-16 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 relative">
                       {item.product.imageUrls?.[0] ? (
-                        <Image src={item.product.imageUrls[0]} alt={item.product.title} fill className="object-cover" unoptimized />
+                        <Image src={item.product.imageUrls[0]} alt={item.product.title} fill sizes="64px" className="object-cover" />
                       ) : (
                         <div className="flex items-center justify-center h-full text-2xl">🥬</div>
                       )}

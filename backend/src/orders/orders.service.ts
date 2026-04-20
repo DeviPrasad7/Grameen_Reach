@@ -38,6 +38,13 @@ export class OrdersService {
       throw new BadRequestException('Cart is empty');
     }
 
+    // Oversell protection — reject if any item's requested qty exceeds current stock
+    const oversold = cart.items.filter((i) => i.qty > i.product.availableQty);
+    if (oversold.length > 0) {
+      const names = oversold.map((i) => i.product.title).join(', ');
+      throw new BadRequestException(`Insufficient stock for: ${names}`);
+    }
+
     // Group cart items by farmerId
     const farmerGroups = new Map<
       string,
@@ -69,14 +76,21 @@ export class OrdersService {
       }
     }
 
-    // Get delivery fee per sub-order (look up serviceable area)
-    const getDeliveryFee = async (pincode?: string): Promise<number> => {
-      if (!pincode) return 50;
-      const area = await this.prisma.serviceableArea.findUnique({ where: { pincode } });
-      return area?.flatFee ?? 50;
-    };
+    // Pre-fetch all serviceable-area delivery fees in ONE query before the transaction
+    const pincodes = Array.from(
+      new Set(
+        Array.from(farmerGroups.values())
+          .map((g) => g.items[0]?.product.pincode)
+          .filter((p): p is string => !!p),
+      ),
+    );
+    const areas = pincodes.length
+      ? await this.prisma.serviceableArea.findMany({ where: { pincode: { in: pincodes } } })
+      : [];
+    const feeByPincode = new Map(areas.map((a) => [a.pincode, a.flatFee]));
+    const getFee = (pincode?: string | null) => (pincode && feeByPincode.get(pincode)) ?? 50;
 
-    // Create parent Order + SubOrders in a transaction
+    // Create parent Order + SubOrders in a transaction, using nested createMany for items
     const order = await this.prisma.$transaction(async (tx) => {
       const parentOrder = await tx.order.create({
         data: {
@@ -89,43 +103,43 @@ export class OrdersService {
         },
       });
 
+      // Create all sub-orders + their items sequentially (Prisma doesn't return IDs from createMany)
+      // but parallelize the product decrements at the end.
       for (const [, { farmerProfileId, items }] of farmerGroups) {
-        let subAmount = 0;
-        for (const item of items) {
-          const unitPrice = item.product.fixedPrice ?? item.product.minBidPrice ?? 0;
-          subAmount += unitPrice * item.qty;
-        }
+        const subAmount = items.reduce((sum, i) => {
+          const unitPrice = i.product.fixedPrice ?? i.product.minBidPrice ?? 0;
+          return sum + unitPrice * i.qty;
+        }, 0);
 
-        const deliveryFee = await getDeliveryFee(items[0]?.product.pincode ?? undefined);
-
-        const subOrder = await tx.subOrder.create({
+        await tx.subOrder.create({
           data: {
             orderId: parentOrder.id,
             farmerProfileId,
             amount: subAmount,
-            deliveryFee,
+            deliveryFee: getFee(items[0]?.product.pincode),
             status: 'PLACED',
+            items: {
+              createMany: {
+                data: items.map((i) => ({
+                  productId: i.productId,
+                  qty: i.qty,
+                  unitPrice: i.product.fixedPrice ?? i.product.minBidPrice ?? 0,
+                })),
+              },
+            },
           },
         });
+      }
 
-        for (const item of items) {
-          const unitPrice = item.product.fixedPrice ?? item.product.minBidPrice ?? 0;
-          await tx.subOrderItem.create({
-            data: {
-              subOrderId: subOrder.id,
-              productId: item.productId,
-              qty: item.qty,
-              unitPrice,
-            },
-          });
-
-          // Decrement available quantity
-          await tx.product.update({
+      // Parallel decrement of all product quantities
+      await Promise.all(
+        cart.items.map((item) =>
+          tx.product.update({
             where: { id: item.productId },
             data: { availableQty: { decrement: item.qty } },
-          });
-        }
-      }
+          }),
+        ),
+      );
 
       return parentOrder;
     });

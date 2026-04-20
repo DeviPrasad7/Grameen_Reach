@@ -444,9 +444,33 @@ Flag misleading claims, inappropriate content, or pricing that is clearly off (e
   async getAuditLogs(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
-      this.prisma.aiRequest.findMany({ skip, take: limit, orderBy: { createdAt: 'desc' }, include: { user: { select: { name: true, email: true } } } }),
+      this.prisma.aiRequest.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, userId: true, feature: true, model: true,
+          tokens: true, cached: true, durationMs: true, createdAt: true,
+          // omit prompt/response from list to keep payload small
+        },
+      }),
       this.prisma.aiRequest.count(),
     ]);
-    return { items, total, page, limit };
+
+    const userIds = [...new Set(items.map((i) => i.userId).filter((id): id is string => !!id))];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return {
+      items: items.map((i) => ({ ...i, user: i.userId ? userMap.get(i.userId) ?? null : null })),
+      total,
+      page,
+      limit,
+    };
   }
 }

@@ -231,7 +231,7 @@ export default function ProductDetailPage() {
           {/* Image section */}
           <div className="relative h-64 sm:h-80 bg-slate-100">
             {images.length > 0 ? (
-              <Image src={images[imgIdx] || images[0]} alt={product.title} fill className="object-cover" unoptimized />
+              <Image src={images[imgIdx] || images[0]} alt={product.title} fill priority sizes="(max-width: 640px) 100vw, 800px" className="object-cover" />
             ) : (
               <div className="flex items-center justify-center h-full text-7xl">🥬</div>
             )}
@@ -683,8 +683,8 @@ export default function ProductDetailPage() {
                           src={sp.imageUrls[0]}
                           alt={sp.title}
                           fill
+                          sizes="(max-width: 640px) 50vw, 200px"
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
-                          unoptimized
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       </>

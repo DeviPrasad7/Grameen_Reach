@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { productsApi, cartApi, categoriesApi } from '@/lib/api';
@@ -141,10 +141,10 @@ export default function BrowsePage() {
     return styles[type] || { bg: 'bg-slate-100 text-slate-600', icon: null };
   };
 
-  const getEffectivePrice = (p: Product) => p.fixedPrice || p.minBidPrice || 0;
+  const getEffectivePrice = useCallback((p: Product) => p.fixedPrice || p.minBidPrice || 0, []);
 
-  const displayProducts = (() => {
-    let filtered = [...products];
+  const displayProducts = useMemo(() => {
+    let filtered = products;
     if (organicOnly) filtered = filtered.filter((p) => p.organic === true);
     if (minPrice !== '') {
       const min = parseFloat(minPrice);
@@ -154,11 +154,14 @@ export default function BrowsePage() {
       const max = parseFloat(maxPrice);
       if (!isNaN(max)) filtered = filtered.filter((p) => getEffectivePrice(p) <= max);
     }
-    if (sortBy === 'price_asc') filtered.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
-    else if (sortBy === 'price_desc') filtered.sort((a, b) => getEffectivePrice(b) - getEffectivePrice(a));
-    else if (sortBy === 'name_asc') filtered.sort((a, b) => a.title.localeCompare(b.title));
+    if (sortBy === 'price_asc' || sortBy === 'price_desc' || sortBy === 'name_asc') {
+      filtered = [...filtered];
+      if (sortBy === 'price_asc') filtered.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
+      else if (sortBy === 'price_desc') filtered.sort((a, b) => getEffectivePrice(b) - getEffectivePrice(a));
+      else if (sortBy === 'name_asc') filtered.sort((a, b) => a.title.localeCompare(b.title));
+    }
     return filtered;
-  })();
+  }, [products, organicOnly, minPrice, maxPrice, sortBy, getEffectivePrice]);
 
   const getDaysAgo = (dateStr?: string) => {
     if (!dateStr) return null;
@@ -374,8 +377,8 @@ export default function BrowsePage() {
                             src={p.imageUrls[0]}
                             alt={p.title}
                             fill
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             className="object-cover group-hover:scale-110 transition-transform duration-500"
-                            unoptimized
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         </>

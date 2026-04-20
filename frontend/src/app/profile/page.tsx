@@ -51,26 +51,28 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      const res = await usersApi.me();
-      setProfile(res.data);
-      setForm({ name: res.data.name || '', phone: res.data.phone || '' });
+      const [userRes, farmerRes] = await Promise.allSettled([
+        usersApi.me(),
+        user?.role === 'FARMER' ? farmerApi.getProfile() : Promise.resolve(null),
+      ]);
 
-      if (user?.role === 'FARMER') {
-        try {
-          const fp = await farmerApi.getProfile();
-          setFarmerProfile(fp.data);
-          setFarmerForm({
-            village: fp.data.village || '',
-            district: fp.data.district || '',
-            pincode: fp.data.pincode || '',
-            bio: fp.data.bio || '',
-          });
-        } catch {
-          // No farmer profile yet
-        }
+      if (userRes.status === 'fulfilled') {
+        setProfile(userRes.value.data);
+        setForm({ name: userRes.value.data.name || '', phone: userRes.value.data.phone || '' });
+      } else {
+        toast.error(t({ en: 'Failed to load profile', te: 'ప్రొఫైల్ లోడ్ చేయడం విఫలమైంది' }));
       }
-    } catch {
-      toast.error(t({ en: 'Failed to load profile', te: 'ప్రొఫైల్ లోడ్ చేయడం విఫలమైంది' }));
+
+      if (farmerRes.status === 'fulfilled' && farmerRes.value) {
+        const fp = farmerRes.value.data;
+        setFarmerProfile(fp);
+        setFarmerForm({
+          village: fp.village || '',
+          district: fp.district || '',
+          pincode: fp.pincode || '',
+          bio: fp.bio || '',
+        });
+      }
     } finally {
       setLoading(false);
     }

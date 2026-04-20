@@ -602,7 +602,7 @@ export default function BasketBuilderPage() {
                               <div className="flex gap-3">
                                 <div className={`relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 ${!inStock ? 'opacity-60' : ''} bg-slate-100`}>
                                   {p?.imageUrls?.[0] ? (
-                                    <Image src={p.imageUrls[0]} alt={p.title} fill className="object-cover" unoptimized />
+                                    <Image src={p.imageUrls[0]} alt={p.title} fill sizes="64px" className="object-cover" />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center text-2xl">
                                       {!p ? '❔' : '🥬'}

@@ -131,6 +131,9 @@ model FarmerDoc {
   reviewNotes     String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
+  @@index([farmerProfileId])
+  @@index([status])
 }
 
 model Category {
@@ -175,6 +178,12 @@ model Product {
   cartItems      CartItem[]
   subOrderItems  SubOrderItem[]
   customerMessages CustomerMessage[]
+
+  @@index([farmerId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([district])
 }
 
 model Bid {
@@ -190,6 +199,10 @@ model Bid {
   counterMessage String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([buyerId, createdAt(sort: Desc)])
+  @@index([status])
 }
 
 model CustomerMessage {
@@ -246,6 +259,9 @@ model Order {
   updatedAt       DateTime      @updatedAt
 
   subOrders       SubOrder[]
+
+  @@index([buyerId, createdAt(sort: Desc)])
+  @@index([status])
 }
 
 model SubOrder {
@@ -261,6 +277,10 @@ model SubOrder {
   updatedAt       DateTime      @updatedAt
 
   items           SubOrderItem[]
+
+  @@index([orderId])
+  @@index([farmerProfileId, createdAt(sort: Desc)])
+  @@index([status])
 }
 
 model SubOrderItem {
@@ -304,6 +324,10 @@ model AiRequest {
   cached     Boolean  @default(false)
   durationMs Int      @default(0)
   createdAt  DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([feature, createdAt(sort: Desc)])
+  @@index([userId])
 }
 
 model ServiceableArea {

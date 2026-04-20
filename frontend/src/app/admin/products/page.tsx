@@ -181,7 +181,7 @@ export default function AdminProductsPage() {
                       <td className="px-4 py-3">
                         <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden relative flex-shrink-0">
                           {p.imageUrls?.[0] ? (
-                            <Image src={p.imageUrls[0]} alt="" fill className="object-cover" unoptimized />
+                            <Image src={p.imageUrls[0]} alt="" fill sizes="40px" className="object-cover" />
                           ) : (
                             <div className="flex items-center justify-center h-full">
                               <ImageOff className="w-4 h-4 text-slate-300" />

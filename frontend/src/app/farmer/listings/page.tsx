@@ -190,8 +190,8 @@ export default function FarmerListingsPage() {
                         src={p.imageUrls[0]}
                         alt={p.title}
                         fill
+                        sizes="64px"
                         className="object-cover"
-                        unoptimized
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">
