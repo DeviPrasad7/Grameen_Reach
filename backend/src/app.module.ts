@@ -15,6 +15,7 @@ import { GovtPricesModule } from './govt-prices/govt-prices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AiModule } from './ai/ai.module';
 import { FilesModule } from './files/files.module';
+import { MessagesModule } from './messages/messages.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { FilesModule } from './files/files.module';
     PaymentsModule,
     AiModule,
     FilesModule,
+    MessagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -15,4 +15,4 @@ COPY prisma ./prisma
 RUN npx prisma generate
 COPY --from=builder /app/dist ./dist
 EXPOSE 3001
-CMD ["node", "dist/src/main"]
+CMD ["sh", "-c", "npx prisma db push && node prisma/seed-runtime.js && node dist/src/main"]

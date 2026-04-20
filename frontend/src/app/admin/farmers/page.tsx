@@ -18,6 +18,16 @@ interface FarmerPending {
   docs: { id: string; docType: string; fileUrl: string; notes?: string; status: string }[];
 }
 
+const DOC_LABELS: Record<string, string> = {
+  RATION_CARD: 'Ration Card',
+  FARMER_ID: 'Farmer ID',
+  LAND_DOCUMENT: 'Land Document',
+  AADHAAR: 'Aadhaar',
+  OTHER: 'Other Document',
+};
+
+const formatDocLabel = (docType: string) => DOC_LABELS[docType] || docType.replace(/_/g, ' ');
+
 const DOC_STATUS_COLOR: Record<string, string> = {
   PENDING: 'bg-amber-100 text-amber-700',
   APPROVED: 'bg-green-100 text-green-700',
@@ -202,7 +212,7 @@ export default function AdminFarmersPage() {
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
                             <FileText className="w-4 h-4 text-slate-400" />
-                            {doc.docType.replace(/_/g, ' ')}
+                            {formatDocLabel(doc.docType)}
                           </span>
                           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${DOC_STATUS_COLOR[doc.status] || 'bg-slate-100 text-slate-600'}`}>
                             {doc.status}

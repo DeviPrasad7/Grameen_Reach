@@ -97,6 +97,14 @@ export const farmerApi = {
   getMyDocs: () => api.get('/farmer/docs'),
 };
 
+// ── Messages ─────────────────────────────────────────────────────────────
+export const messagesApi = {
+  send: (data: { productId: string; message: string }) => api.post('/messages', data),
+  sent: () => api.get('/messages/sent'),
+  inbox: () => api.get('/messages/inbox'),
+  markRead: (id: string) => api.patch(`/messages/${id}/read`),
+};
+
 // ── Admin ─────────────────────────────────────────────────────────────────
 export const adminApi = {
   pendingFarmers: () => api.get('/admin/farmers/pending'),

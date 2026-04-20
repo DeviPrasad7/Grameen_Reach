@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { productsApi, cartApi, bidsApi, aiApi, govtPricesApi } from '@/lib/api';
+import { productsApi, cartApi, bidsApi, aiApi, govtPricesApi, messagesApi } from '@/lib/api';
 import { useAuthStore, useLangStore, useCartCountStore } from '@/lib/store';
 import toast from 'react-hot-toast';
-import { ArrowLeft, ShoppingCart, Gavel, Leaf, MapPin, Award, Calendar, Package, ShieldCheck, Loader2, Share2, Heart, Copy, Check, Bot, MessageSquare, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Gavel, Leaf, MapPin, Award, Calendar, Package, ShieldCheck, Loader2, Share2, Heart, Copy, Check, Bot, MessageSquare, Send, ChevronDown, ChevronUp, Star, ThumbsUp } from 'lucide-react';
+import { addRecentlyViewed } from '@/lib/recently-viewed';
 
 interface Product {
   id: string;
@@ -45,6 +46,11 @@ export default function ProductDetailPage() {
   const [contactOpen, setContactOpen] = useState(false);
   const [enquiryMsg, setEnquiryMsg] = useState('');
   const [enquirySending, setEnquirySending] = useState(false);
+  // Reviews state (localStorage-based)
+  const [reviews, setReviews] = useState<{ name: string; rating: number; comment: string; date: string }[]>([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   useEffect(() => {
     if (params?.id) {
@@ -54,6 +60,16 @@ export default function ProductDetailPage() {
         .finally(() => setLoading(false));
     }
   }, [params?.id]);
+
+  // Track recently viewed + load reviews
+  useEffect(() => {
+    if (!product) return;
+    addRecentlyViewed(product.id);
+    try {
+      const stored = JSON.parse(localStorage.getItem(`gr_reviews_${product.id}`) || '[]');
+      setReviews(stored);
+    } catch {}
+  }, [product?.id]);
 
   // Fetch similar products and price comparison when product is loaded
   useEffect(() => {
@@ -147,14 +163,39 @@ export default function ProductDetailPage() {
       toast.error(t({ en: 'Please enter a message', te: 'దయచేసి సందేశం నమోదు చేయండి' }));
       return;
     }
+    if (!user) { router.push('/auth/login'); return; }
     setEnquirySending(true);
-    // Simulated delay for UI placeholder
-    await new Promise((r) => setTimeout(r, 600));
-    toast.success(t({ en: 'Enquiry sent!', te: 'విచారణ పంపబడింది!' }));
-    setEnquiryMsg('');
-    setContactOpen(false);
-    setEnquirySending(false);
+    try {
+      await messagesApi.send({ productId: product!.id, message: enquiryMsg.trim() });
+      toast.success(t({ en: 'Enquiry sent!', te: 'విచారణ పంపబడింది!' }));
+      setEnquiryMsg('');
+      setContactOpen(false);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || t({ en: 'Failed to send enquiry', te: 'విచారణ పంపడం విఫలమైంది' }));
+    } finally {
+      setEnquirySending(false);
+    }
   };
+
+  const submitReview = () => {
+    if (!reviewComment.trim()) { toast.error(t({ en: 'Please write a review', te: 'దయచేసి సమీక్ష రాయండి' })); return; }
+    const newReview = {
+      name: user?.name || t({ en: 'Anonymous', te: 'అనామక' }),
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+      date: new Date().toISOString(),
+    };
+    const updated = [newReview, ...reviews];
+    setReviews(updated);
+    localStorage.setItem(`gr_reviews_${product!.id}`, JSON.stringify(updated));
+    setReviewComment('');
+    setReviewRating(5);
+    setShowReviewForm(false);
+    toast.success(t({ en: 'Review submitted!', te: 'సమీక్ష సమర్పించబడింది!' }));
+  };
+
+  const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -379,7 +420,7 @@ export default function ProductDetailPage() {
                       )}
                       {aiError && !aiLoading && (
                         <div className="bg-red-50 rounded-xl p-4 text-sm text-red-600">
-                          {t({ en: 'AI unavailable. Please try again later.', te: 'AI అందుబాటులో లేదు. దయచేసి తర్వాత మళ్ళీ ప్రయత్నించండి.' })}
+                             {t({ en: 'AI is temporarily unavailable.', te: 'AI తాత్కాలికంగా అందుబాటులో లేదు.' })}
                           <button
                             onClick={() => { setAiError(false); setAiInsight(null); fetchAiInsight(); }}
                             className="ml-2 underline font-medium hover:text-red-700"
@@ -526,6 +567,104 @@ export default function ProductDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Reviews Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm mt-6 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold text-slate-800">
+                {t({ en: 'Reviews', te: 'సమీక్షలు' })}
+              </h2>
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-100">
+                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span className="text-sm font-bold text-amber-700">{avgRating.toFixed(1)}</span>
+                  <span className="text-xs text-slate-400">({reviews.length})</span>
+                </div>
+              )}
+            </div>
+            {user && !showReviewForm && (
+              <button
+                onClick={() => setShowReviewForm(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-primary-600 to-emerald-600 text-white text-sm font-semibold shadow-sm hover:shadow-md transition-all active:scale-95"
+              >
+                <Star className="w-3.5 h-3.5" />
+                {t({ en: 'Write Review', te: 'సమీక్ష రాయండి' })}
+              </button>
+            )}
+          </div>
+
+          {/* Review form */}
+          {showReviewForm && (
+            <div className="mb-6 p-5 bg-slate-50 rounded-xl border border-slate-100 animate-slide-down">
+              <p className="text-sm font-semibold text-slate-700 mb-3">{t({ en: 'Your Rating', te: 'మీ రేటింగ్' })}</p>
+              <div className="flex gap-1.5 mb-4">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setReviewRating(s)}
+                    className="transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Star className={`w-7 h-7 ${s <= reviewRating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} transition-colors`} />
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder={t({ en: 'Share your experience with this product...', te: 'ఈ ఉత్పత్తి గురించి మీ అనుభవాన్ని పంచుకోండి...' })}
+                rows={3}
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none bg-white"
+              />
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => { setShowReviewForm(false); setReviewComment(''); }}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-white transition-all"
+                >
+                  {t({ en: 'Cancel', te: 'రద్దు' })}
+                </button>
+                <button
+                  onClick={submitReview}
+                  className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-emerald-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all active:scale-95"
+                >
+                  {t({ en: 'Submit Review', te: 'సమీక్ష సమర్పించు' })}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Reviews list */}
+          {reviews.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                <Star className="w-7 h-7 text-slate-300" />
+              </div>
+              <p className="text-sm text-slate-400">{t({ en: 'No reviews yet. Be the first!', te: 'ఇంకా సమీక్షలు లేవు. మొదటిగా ఉండండి!' })}</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((r, i) => (
+                <div key={i} className="flex gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-emerald-100 text-primary-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                    {r.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-slate-800">{r.name}</p>
+                      <span className="text-xs text-slate-400">{new Date(r.date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex gap-0.5 mb-2">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} className={`w-3.5 h-3.5 ${s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`} />
+                      ))}
+                    </div>
+                    <p className="text-sm text-slate-600 leading-relaxed">{r.comment}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Similar Products */}
         {similarProducts.length > 0 && (

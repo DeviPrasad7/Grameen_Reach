@@ -11,6 +11,16 @@ import {
 
 const UNITS = ['kg', 'quintal', 'bag', 'crate', 'bunch', 'litre', 'dozen'];
 const GRADES = ['A', 'B', 'C'];
+const DEFAULT_CATEGORIES = [
+  { id: 'cat-vegetables', name: 'Vegetables', nameTE: 'కూరగాయలు', icon: '🥬' },
+  { id: 'cat-fruits', name: 'Fruits', nameTE: 'పళ్ళు', icon: '🍎' },
+  { id: 'cat-grains', name: 'Grains', nameTE: 'ధాన్యాలు', icon: '🌾' },
+  { id: 'cat-pulses', name: 'Pulses', nameTE: 'పప్పులు', icon: '🫘' },
+  { id: 'cat-dairy', name: 'Dairy', nameTE: 'పాల ఉత్పత్తులు', icon: '🥛' },
+  { id: 'cat-spices', name: 'Spices', nameTE: 'మసాలాలు', icon: '🌶️' },
+  { id: 'cat-oils', name: 'Oils', nameTE: 'నూనెలు', icon: '🫒' },
+  { id: 'cat-dry-fruits', name: 'Dry Fruits', nameTE: 'డ్రై ఫ్రూట్స్', icon: '🥜' },
+];
 
 interface Category {
   id: string;
@@ -53,8 +63,8 @@ export default function NewListingPage() {
     if (!user) { router.push('/auth/login'); return; }
     if (user.role !== 'FARMER') { router.push('/'); return; }
     categoriesApi.list()
-      .then((r) => setCategories(r.data || []))
-      .catch(() => {});
+      .then((r) => setCategories((r.data || []).length > 0 ? r.data : DEFAULT_CATEGORIES))
+      .catch(() => setCategories(DEFAULT_CATEGORIES));
   }, [_hasHydrated, user, router]);
 
   const set = (key: string, value: unknown) =>

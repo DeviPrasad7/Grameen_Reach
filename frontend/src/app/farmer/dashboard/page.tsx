@@ -2,14 +2,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { productsApi, bidsApi, aiApi, ordersApi } from '@/lib/api';
+import { productsApi, bidsApi, aiApi, ordersApi, messagesApi } from '@/lib/api';
 import { useAuthStore, useLangStore } from '@/lib/store';
+import AiResponseRenderer, { extractAiResponseText } from '@/components/ui/AiResponseRenderer';
 import toast from 'react-hot-toast';
 import {
   Loader2, Plus, Package, Gavel, BarChart3,
   Bot, Sparkles, ArrowRight, ShoppingCart,
   ClipboardList, Store, Send, IndianRupee,
-  TrendingUp, Clock,
+  TrendingUp, Clock, Users, MessageSquare,
 } from 'lucide-react';
 
 interface BidItem {
@@ -41,6 +42,15 @@ interface SubOrder {
   };
 }
 
+interface FarmerMessage {
+  id: string;
+  message: string;
+  readAt?: string | null;
+  createdAt: string;
+  buyer: { name: string; email: string; phone?: string };
+  product: { id: string; title: string; unit: string; district?: string };
+}
+
 export default function FarmerDashboard() {
   const router = useRouter();
   const { user, _hasHydrated } = useAuthStore();
@@ -48,6 +58,7 @@ export default function FarmerDashboard() {
   const [products, setProducts] = useState<{ status: string }[]>([]);
   const [bids, setBids] = useState<BidItem[]>([]);
   const [subOrders, setSubOrders] = useState<SubOrder[]>([]);
+  const [messages, setMessages] = useState<FarmerMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiInput, setAiInput] = useState('');
   const [aiResult, setAiResult] = useState('');
@@ -69,6 +80,9 @@ export default function FarmerDashboard() {
       bidsApi.farmerBids()
         .then((r) => setBids(r.data || []))
         .catch(() => {}),
+      messagesApi.inbox()
+        .then((r) => setMessages(r.data || []))
+        .catch(() => {}),
       ordersApi.list()
         .then((r) => setSubOrders(r.data || []))
         .catch(() => {}),
@@ -85,11 +99,11 @@ export default function FarmerDashboard() {
     setAiResult('');
     try {
       const res = await aiApi.listingGenerator({ prompt: trimmed });
-      setAiResult(res.data.result || res.data.response || JSON.stringify(res.data));
+      setAiResult(extractAiResponseText(res.data));
       toast.success(t({ en: 'Listing generated!', te: 'జాబితా రూపొందించబడింది!' }));
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      const fallback = t({ en: 'AI unavailable. Set GEMINI_API_KEY.', te: 'AI అందుబాటులో లేదు. GEMINI_API_KEY సెట్ చేయండి.' });
+      const fallback = t({ en: 'AI is temporarily unavailable.', te: 'AI తాత్కాలికంగా అందుబాటులో లేదు.' });
       setAiResult(msg || fallback);
       toast.error(msg || fallback);
     } finally {
@@ -106,11 +120,11 @@ export default function FarmerDashboard() {
     setPcResult('');
     try {
       const res = await aiApi.priceCoach({ commodity: pcCommodity.trim(), district: pcDistrict });
-      setPcResult(res.data.result || res.data.response || JSON.stringify(res.data));
+      setPcResult(extractAiResponseText(res.data));
       toast.success(t({ en: 'Price advice ready!', te: 'ధర సలహా సిద్ధం!' }));
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      const fallback = t({ en: 'AI unavailable. Set GEMINI_API_KEY.', te: 'AI అందుబాటులో లేదు. GEMINI_API_KEY సెట్ చేయండి.' });
+      const fallback = t({ en: 'AI is temporarily unavailable.', te: 'AI తాత్కాలికంగా అందుబాటులో లేదు.' });
       setPcResult(msg || fallback);
       toast.error(msg || fallback);
     } finally {
@@ -119,9 +133,10 @@ export default function FarmerDashboard() {
   };
 
   const renderAiResult = (result: string) => {
+    const normalized = result.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
     // Try parsing as JSON
     try {
-      const parsed = JSON.parse(result);
+      const parsed = JSON.parse(normalized);
       if (parsed && typeof parsed === 'object' && (parsed.title || parsed.suggestedPrice || parsed.description)) {
         const params = new URLSearchParams();
         if (parsed.title) params.set('title', parsed.title);
@@ -202,79 +217,8 @@ export default function FarmerDashboard() {
       // Not JSON — fall through to formatted text
     }
 
-    // Plain text: render with line breaks, bullet points
-    const lines = result.split('\n');
-    return (
-      <div className="space-y-1">
-        {lines.map((line, i) => {
-          const trimmed = line.trim();
-          if (!trimmed) return <div key={i} className="h-2" />;
-          // Bullet points
-          if (/^[-*•]\s/.test(trimmed)) {
-            return (
-              <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                <span className="text-primary-500 mt-0.5">•</span>
-                <span>{trimmed.replace(/^[-*•]\s+/, '')}</span>
-              </div>
-            );
-          }
-          // Numbered items
-          if (/^\d+[.)]\s/.test(trimmed)) {
-            return (
-              <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                <span className="text-primary-600 font-semibold min-w-[1.25rem]">{trimmed.match(/^\d+/)?.[0]}.</span>
-                <span>{trimmed.replace(/^\d+[.)]\s+/, '')}</span>
-              </div>
-            );
-          }
-          // Bold-like headings (lines ending with colon or all caps)
-          if (/^[A-Z\s]{4,}:?$/.test(trimmed) || /\*\*.*\*\*/.test(trimmed)) {
-            return (
-              <p key={i} className="text-sm font-semibold text-slate-800 mt-2">
-                {trimmed.replace(/\*\*/g, '')}
-              </p>
-            );
-          }
-          return <p key={i} className="text-sm text-slate-700">{line}</p>;
-        })}
-      </div>
-    );
-  };
-
-  const renderPriceCoachResult = (result: string) => {
-    const lines = result.split('\n');
-    return (
-      <div className="space-y-1">
-        {lines.map((line, i) => {
-          const trimmed = line.trim();
-          if (!trimmed) return <div key={i} className="h-2" />;
-          if (/^[-*•]\s/.test(trimmed)) {
-            return (
-              <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                <span className="text-blue-500 mt-0.5">•</span>
-                <span>{trimmed.replace(/^[-*•]\s+/, '')}</span>
-              </div>
-            );
-          }
-          if (/^\d+[.)]\s/.test(trimmed)) {
-            return (
-              <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                <span className="text-blue-600 font-semibold min-w-[1.25rem]">{trimmed.match(/^\d+/)?.[0]}.</span>
-                <span>{trimmed.replace(/^\d+[.)]\s+/, '')}</span>
-              </div>
-            );
-          }
-          if (/^[A-Z\s]{4,}:?$/.test(trimmed) || /\*\*.*\*\*/.test(trimmed)) {
-            return (
-              <p key={i} className="text-sm font-semibold text-slate-800 mt-2">
-                {trimmed.replace(/\*\*/g, '')}
-              </p>
-            );
-          }
-          return <p key={i} className="text-sm text-slate-700">{line}</p>;
-        })}
-      </div>
-    );
+    // Plain text: use shared AI renderer
+    return <AiResponseRenderer text={normalized} accentColor="primary" />;
   };
 
   const priceCoachDistricts = [
@@ -307,6 +251,7 @@ export default function FarmerDashboard() {
   const deliveredOrders = subOrders.filter((so) => so.status === 'DELIVERED');
   const pendingOrders = subOrders.filter((so) => so.status === 'PLACED' || so.status === 'CONFIRMED');
   const totalRevenue = deliveredOrders.reduce((sum, so) => sum + so.amount, 0);
+  const unreadMessages = messages.filter((m) => !m.readAt).length;
 
   const stats = [
     {
@@ -340,6 +285,12 @@ export default function FarmerDashboard() {
       color: 'bg-orange-50 text-orange-600',
     },
     {
+      label: t({ en: 'Unread Messages', te: 'చదవని సందేశాలు' }),
+      value: unreadMessages,
+      icon: MessageSquare,
+      color: 'bg-fuchsia-50 text-fuchsia-600',
+    },
+    {
       label: t({ en: 'Completed Orders', te: 'పూర్తయిన ఆర్డర్లు' }),
       value: deliveredOrders.length,
       icon: TrendingUp,
@@ -348,6 +299,8 @@ export default function FarmerDashboard() {
   ];
 
   const quickLinks = [
+    { href: '/profile', label: { en: 'Profile & Verification', te: 'ప్రొఫైల్ & ధృవీకరణ' }, icon: Users, color: 'text-emerald-600' },
+    { href: '/farmer/messages', label: { en: 'Customer Messages', te: 'కస్టమర్ సందేశాలు' }, icon: MessageSquare, color: 'text-fuchsia-600' },
     { href: '/farmer/listings', label: { en: 'My Listings', te: 'నా జాబితాలు' }, icon: Package, color: 'text-primary-600' },
     { href: '/farmer/bids', label: { en: 'Manage Bids', te: 'బిడ్లు నిర్వహించు' }, icon: Gavel, color: 'text-amber-600' },
     { href: '/farmer/orders', label: { en: 'Orders', te: 'ఆర్డర్లు' }, icon: ClipboardList, color: 'text-blue-600' },
@@ -529,7 +482,7 @@ export default function FarmerDashboard() {
                   {t({ en: 'Price Advice', te: 'ధర సలహా' })}
                 </span>
               </div>
-              {renderPriceCoachResult(pcResult)}
+              <AiResponseRenderer text={pcResult} accentColor="blue" />
             </div>
           )}
         </div>

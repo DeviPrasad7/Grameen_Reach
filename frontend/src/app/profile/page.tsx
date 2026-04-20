@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { usersApi, farmerApi } from '@/lib/api';
+import { usersApi, farmerApi, filesApi } from '@/lib/api';
 import { useAuthStore, useLangStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 import { User, Mail, Phone, Calendar, Shield, MapPin, Save, Loader2, FileText, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
@@ -17,6 +17,16 @@ interface FarmerProfile {
   docs: { id: string; docType: string; status: string; fileUrl: string; createdAt: string }[];
 }
 
+const DOC_LABELS: Record<string, string> = {
+  RATION_CARD: 'Ration Card',
+  FARMER_ID: 'Farmer ID',
+  LAND_DOCUMENT: 'Land Document',
+  AADHAAR: 'Aadhaar',
+  OTHER: 'Other Document',
+};
+
+const formatDocLabel = (docType: string) => DOC_LABELS[docType] || docType.replace(/_/g, ' ');
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user, _hasHydrated, setAuth } = useAuthStore();
@@ -25,9 +35,13 @@ export default function ProfilePage() {
   const [farmerProfile, setFarmerProfile] = useState<FarmerProfile | null>(null);
   const [form, setForm] = useState({ name: '', phone: '' });
   const [farmerForm, setFarmerForm] = useState({ village: '', district: '', pincode: '', bio: '' });
+  const [docForm, setDocForm] = useState({ docType: 'RATION_CARD', fileUrl: '', docNumber: '', notes: '' });
+  const [selectedDocFile, setSelectedDocFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingFarmer, setSavingFarmer] = useState(false);
+  const [savingDoc, setSavingDoc] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   useEffect(() => {
     if (!_hasHydrated) return;
@@ -93,6 +107,61 @@ export default function ProfilePage() {
       toast.error(msg || t({ en: 'Failed to save farmer profile', te: 'రైతు ప్రొఫైల్ సేవ్ విఫలమైంది' }));
     } finally {
       setSavingFarmer(false);
+    }
+  };
+
+  const submitDoc = async () => {
+    if (!farmerProfile && user?.role === 'FARMER') {
+      toast.error(t({ en: 'Save your farmer profile first', te: 'ముందుగా మీ రైతు ప్రొఫైల్‌ను సేవ్ చేయండి' }));
+      return;
+    }
+    if (!docForm.fileUrl.trim()) {
+      toast.error(t({ en: 'Please upload a document or enter a URL', te: 'దయచేసి పత్రం అప్‌లోడ్ చేయండి లేదా URL నమోదు చేయండి' }));
+      return;
+    }
+    setSavingDoc(true);
+    try {
+      await farmerApi.uploadDoc({
+        docType: docForm.docType,
+        fileUrl: docForm.fileUrl.trim(),
+        docNumber: docForm.docNumber.trim() || undefined,
+        notes: docForm.notes.trim() || undefined,
+      });
+      toast.success(t({ en: 'Document submitted for review!', te: 'పత్రం సమీక్ష కోసం సమర్పించబడింది!' }));
+      setDocForm({ docType: 'RATION_CARD', fileUrl: '', docNumber: '', notes: '' });
+      setSelectedDocFile(null);
+      loadProfile();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || t({ en: 'Failed to submit document', te: 'పత్రాన్ని సమర్పించడం విఫలమైంది' }));
+    } finally {
+      setSavingDoc(false);
+    }
+  };
+
+  const uploadDocFile = async () => {
+    if (!selectedDocFile) {
+      toast.error(t({ en: 'Choose a file first', te: 'ముందుగా ఫైల్ ఎంచుకోండి' }));
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedDocFile);
+      const res = await filesApi.upload(formData);
+      const url = res.data?.url || res.data?.fileUrl;
+      if (!url) {
+        throw new Error('Upload returned no file URL');
+      }
+      setDocForm((prev) => ({ ...prev, fileUrl: url }));
+      setSelectedDocFile(null);
+      toast.success(t({ en: 'File uploaded to MinIO', te: 'ఫైల్ MinIOకి అప్‌లోడ్ అయింది' }));
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || t({ en: 'Failed to upload file', te: 'ఫైల్ అప్‌లోడ్ విఫలమైంది' }));
+    } finally {
+      setUploadingDoc(false);
     }
   };
 
@@ -224,6 +293,71 @@ export default function ProfilePage() {
                   {savingFarmer ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   {savingFarmer ? t({ en: 'Saving...', te: 'సేవ్ అవుతోంది...' }) : t({ en: 'Save Farmer Profile', te: 'రైతు ప్రొఫైల్ సేవ్ చేయి' })}
                 </button>
+
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary-600" />
+                    {t({ en: 'Submit Verification Document', te: 'ధృవీకరణ పత్రం సమర్పించండి' })}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select
+                      value={docForm.docType}
+                      onChange={(e) => setDocForm({ ...docForm, docType: e.target.value })}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                    >
+                      <option value="RATION_CARD">Ration Card</option>
+                      <option value="FARMER_ID">Farmer ID</option>
+                      <option value="LAND_DOCUMENT">Land Document</option>
+                      <option value="AADHAAR">Aadhaar</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                    <input
+                      value={docForm.docNumber}
+                      onChange={(e) => setDocForm({ ...docForm, docNumber: e.target.value })}
+                      placeholder={t({ en: 'Document number (optional)', te: 'పత్ర సంఖ్య (ఐచ్ఛికం)' })}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="mt-3 grid gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => setSelectedDocFile(e.target.files?.[0] || null)}
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                      />
+                      <button
+                        type="button"
+                        onClick={uploadDocFile}
+                        disabled={uploadingDoc || !selectedDocFile}
+                        className="sm:w-44 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 transition-all"
+                      >
+                        {uploadingDoc ? t({ en: 'Uploading...', te: 'అప్‌లోడ్ అవుతోంది...' }) : t({ en: 'Upload to MinIO', te: 'MinIOకి అప్‌లోడ్ చేయి' })}
+                      </button>
+                    </div>
+                    <input
+                      value={docForm.fileUrl}
+                      onChange={(e) => setDocForm({ ...docForm, fileUrl: e.target.value })}
+                      placeholder={t({ en: 'Uploaded file URL will appear here', te: 'అప్‌లోడ్ చేసిన ఫైల్ URL ఇక్కడ కనిపిస్తుంది' })}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                    />
+                  </div>
+                  <textarea
+                    value={docForm.notes}
+                    onChange={(e) => setDocForm({ ...docForm, notes: e.target.value })}
+                    rows={3}
+                    placeholder={t({ en: 'Notes for admin review (optional)', te: 'అడ్మిన్ సమీక్ష కోసం గమనికలు (ఐచ్ఛికం)' })}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent mt-3"
+                  />
+                  <button
+                    onClick={submitDoc}
+                    disabled={savingDoc}
+                    className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all"
+                  >
+                    {savingDoc ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                    {savingDoc ? t({ en: 'Submitting...', te: 'సమర్పిస్తోంది...' }) : t({ en: 'Submit Document', te: 'పత్రం సమర్పించు' })}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -240,7 +374,7 @@ export default function ProfilePage() {
                       <div className="flex items-center gap-3">
                         <FileText className="w-4 h-4 text-slate-400" />
                         <div>
-                          <p className="text-sm font-medium text-slate-700">{doc.docType.replace(/_/g, ' ')}</p>
+                          <p className="text-sm font-medium text-slate-700">{formatDocLabel(doc.docType)}</p>
                           <p className="text-[10px] text-slate-400">{new Date(doc.createdAt).toLocaleDateString()}</p>
                         </div>
                       </div>

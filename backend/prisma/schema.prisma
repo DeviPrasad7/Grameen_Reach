@@ -94,6 +94,7 @@ model User {
   cart          Cart?
   orders        Order[]
   aiRequests    AiRequest[]
+  sentMessages  CustomerMessage[]
 }
 
 model FarmerProfile {
@@ -114,6 +115,7 @@ model FarmerProfile {
 
   docs               FarmerDoc[]
   subOrders          SubOrder[]
+  messages           CustomerMessage[]
 }
 
 model FarmerDoc {
@@ -172,6 +174,7 @@ model Product {
   bids           Bid[]
   cartItems      CartItem[]
   subOrderItems  SubOrderItem[]
+  customerMessages CustomerMessage[]
 }
 
 model Bid {
@@ -187,6 +190,24 @@ model Bid {
   counterMessage String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+model CustomerMessage {
+  id               String        @id @default(cuid())
+  productId        String
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  buyerId          String
+  buyer            User          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  farmerProfileId  String
+  farmerProfile    FarmerProfile @relation(fields: [farmerProfileId], references: [id], onDelete: Cascade)
+  message          String
+  readAt           DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([farmerProfileId, createdAt])
+  @@index([buyerId, createdAt])
+  @@index([productId])
 }
 
 model Cart {

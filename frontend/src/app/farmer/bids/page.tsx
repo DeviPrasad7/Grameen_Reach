@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { bidsApi, aiApi } from '@/lib/api';
 import { useAuthStore, useLangStore } from '@/lib/store';
+import AiResponseRenderer, { extractAiResponseText } from '@/components/ui/AiResponseRenderer';
 import toast from 'react-hot-toast';
 import {
   Loader2, Gavel, Bot, Check, X, ArrowRightLeft,
@@ -105,11 +106,11 @@ export default function FarmerBidsPage() {
         },
       });
       setAiSuggestion(
-        res.data.result || res.data.response || t({ en: 'No suggestion available', te: 'సూచన అందుబాటులో లేదు' }),
+        extractAiResponseText(res.data) || t({ en: 'No suggestion available', te: 'సూచన అందుబాటులో లేదు' }),
       );
     } catch {
       setAiSuggestion(
-        t({ en: 'AI unavailable. Set GEMINI_API_KEY in .env', te: 'AI అందుబాటులో లేదు. .envలో GEMINI_API_KEY సెట్ చేయండి' }),
+        t({ en: 'AI is temporarily unavailable.', te: 'AI తాత్కాలికంగా అందుబాటులో లేదు.' }),
       );
     } finally {
       setAiLoading(false);
@@ -296,13 +297,29 @@ export default function FarmerBidsPage() {
 
                       {aiSuggestion && (
                         <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 animate-fade-in">
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <Sparkles className="w-3.5 h-3.5 text-primary-500" />
-                            <span className="text-xs font-semibold text-primary-600">
-                              {t({ en: 'AI Suggestion', te: 'AI సూచన' })}
-                            </span>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-primary-500" />
+                              <span className="text-xs font-semibold text-primary-600">
+                                {t({ en: 'AI Suggestion', te: 'AI సూచన' })}
+                              </span>
+                            </div>
+                            {(() => {
+                              const m = aiSuggestion.match(/₹\s*([0-9]+(?:\.[0-9]+)?)/);
+                              const amt = m ? m[1] : null;
+                              if (!amt) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setCounterAmt(amt)}
+                                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+                                >
+                                  {t({ en: `Use ₹${amt}`, te: `₹${amt} వాడు` })}
+                                </button>
+                              );
+                            })()}
                           </div>
-                          <p className="text-xs text-primary-700 whitespace-pre-wrap">{aiSuggestion}</p>
+                          <AiResponseRenderer text={aiSuggestion} accentColor="primary" />
                         </div>
                       )}
 
